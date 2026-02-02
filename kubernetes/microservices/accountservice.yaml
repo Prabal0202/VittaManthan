@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts
+  labels:
+    app: accounts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accounts
+  template:
+    metadata:
+      labels:
+        app: accounts
+    spec:
+      containers:
+        - name: accounts
+          image: prabal864/livereconai:account-P1
+          ports:
+            - containerPort: 8072
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              valueFrom:
+                configMapKeyRef:
+                  name: microservices-config
+                  key: SPRING_CONFIG_IMPORT
+            - name: SPRING_RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: microservices-config
+                  key: SPRING_RABBITMQ_HOST
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: microservices-config
+                  key: ACCOUNTSERVICE_PORT
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: microservices-config
+                  key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts
+spec:
+  selector:
+    app: accounts
+  ports:
+    - protocol: TCP
+      port: 8072
+      targetPort: 8072
+  type: LoadBalancer
