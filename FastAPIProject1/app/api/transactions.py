@@ -21,6 +21,7 @@ from app.utils.formatters import format_transaction_for_api
 from app.utils.filters import extract_filters_from_query, apply_filters
 from app.utils.query_mode import detect_query_mode
 from app.utils.cache import generate_query_id, get_cached_query, cache_query_results
+from app.utils.chat_history import save_chat_interaction
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,21 @@ async def query_transactions(request: RAGRequest):
                 result = rag_service.process_vector_search_query(vectorstore, request.prompt, k_value)
                 response_data["answer"] = result
                 response_data["matching_transactions_count"] = k_value
+
+        # Save chat interaction to database (if user_id provided)
+        if hasattr(request, 'user_id') and request.user_id:
+            try:
+                save_chat_interaction(
+                    user_id=request.user_id,
+                    query=request.prompt,
+                    response=response_data["answer"],
+                    query_id=None,
+                    mode=response_data.get("mode"),
+                    matching_transactions_count=response_data.get("matching_transactions_count"),
+                    filters_applied=response_data.get("filters_applied")
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to save chat history: {e}")
 
         return RAGResponse(**response_data)
 
@@ -369,6 +385,9 @@ async def ingest_context_data(request: IngestRequest):
     - If user_id is provided: Data is stored separately for that user
     - If user_id is None: Data is stored globally (backward compatible)
     """
+    import time
+    request_start = time.time()
+
     if not embeddings_model or not llm:
         raise HTTPException(status_code=503, detail="Models not initialized")
 
@@ -387,10 +406,19 @@ async def ingest_context_data(request: IngestRequest):
         rag_service = RAGService(embeddings_model, llm)
 
         # Create vector store
+        vector_start = time.time()
         vectorstore, langchain_docs = rag_service.create_vector_store(request.context_data)
+        vector_time = time.time() - vector_start
+        logger.info(f"⏱️ Vector store creation took {vector_time:.2f}s")
 
         # Store in user-specific or global state
+        store_start = time.time()
         set_ingested_data(request.context_data, vectorstore, langchain_docs, user_id=user_id)
+        store_time = time.time() - store_start
+        logger.info(f"⏱️ Data storage took {store_time:.2f}s")
+
+        total_time = time.time() - request_start
+        logger.info(f"⏱️ TOTAL ingest time: {total_time:.2f}s")
 
         ingested_data = get_ingested_data(user_id=user_id)
 
@@ -613,6 +641,20 @@ async def query_with_prompt(request: PromptRequest):
                 response_data["answer"] = result
                 response_data["matching_transactions_count"] = k_value
 
+        # Save chat interaction to database
+        if user_id:
+            try:
+                save_chat_interaction(
+                    user_id=user_id,
+                    query=request.prompt,
+                    response=response_data["answer"],
+                    query_id=query_id,
+                    mode=response_data.get("mode"),
+                    matching_transactions_count=response_data.get("matching_transactions_count"),
+                    filters_applied=response_data.get("filters_applied")
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to save chat history: {e}")
 
         return RAGResponse(**response_data)
 
