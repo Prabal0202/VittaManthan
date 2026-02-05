@@ -22,16 +22,21 @@ class Settings:
     PORT: int = 9000
     RELOAD: bool = True
 
-    # CORS Configuration
-    ALLOW_ORIGINS: list = [
-        "https://vittamanthan.netlify.app",
-        "http://localhost:5173",
-        "http://localhost:8000",
-        "http://localhost:9000",
-    ]
+    # CORS Configuration - Allows access from Netlify app and local development
+    # Can be overridden via ALLOW_ORIGINS environment variable (comma-separated)
+    ALLOW_ORIGINS: list = os.getenv("ALLOW_ORIGINS",
+        "https://vittamanthan.netlify.app,"
+        "http://localhost:5173,"
+        "http://localhost:3000,"
+        "http://localhost:8000,"
+        "http://localhost:9000,"
+        "http://127.0.0.1:5173,"
+        "http://127.0.0.1:3000"
+    ).split(",")
+
     ALLOW_CREDENTIALS: bool = True
-    ALLOW_METHODS: list = ["*"]
-    ALLOW_HEADERS: list = ["*"]
+    ALLOW_METHODS: list = ["*"]  # Allow all HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS)
+    ALLOW_HEADERS: list = ["*"]  # Allow all headers (Content-Type, Authorization, X-Requested-With, etc.)
 
     # OpenAI/LLM Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
