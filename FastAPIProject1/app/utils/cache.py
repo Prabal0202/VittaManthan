@@ -20,7 +20,8 @@ def generate_query_id(prompt: str, filters: Dict[str, Any], user_id: str = None)
     # Include user_id to ensure cache isolation between users
     user_part = f"user_{user_id}_" if user_id else "global_"
     cache_key = f"{user_part}{prompt}_{json.dumps(filters, sort_keys=True)}"
-    return hashlib.md5(cache_key.encode()).hexdigest()
+    query_id = hashlib.md5(cache_key.encode()).hexdigest()
+    return query_id
 
 
 def cleanup_expired_cache():
