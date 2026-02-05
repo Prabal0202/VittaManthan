@@ -4,6 +4,7 @@ Core business logic for transaction querying with LLM
 """
 
 import logging
+import time
 from typing import List, Dict, Tuple, AsyncGenerator
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
@@ -28,6 +29,8 @@ class RAGService:
 
     def create_vector_store(self, documents: List[Dict]) -> Tuple[FAISS, List[Document]]:
         """Create vector store from transaction documents"""
+        start_time = time.time()
+
         langchain_docs = []
         for txn in documents:
             formatted_content = format_transaction_for_vector(txn)
@@ -45,9 +48,15 @@ class RAGService:
             )
             langchain_docs.append(doc)
 
-        logger.info(f"Created {len(langchain_docs)} document objects")
+        doc_time = time.time() - start_time
+        logger.info(f"⏱️ Created {len(langchain_docs)} documents in {doc_time:.2f}s")
 
+        vector_start = time.time()
         vectorstore = FAISS.from_documents(langchain_docs, self.embeddings_model)
+        vector_time = time.time() - vector_start
+
+        total_time = time.time() - start_time
+        logger.info(f"⏱️ Vector store created in {vector_time:.2f}s (total: {total_time:.2f}s)")
         logger.info("✅ Vector store created")
 
         return vectorstore, langchain_docs
