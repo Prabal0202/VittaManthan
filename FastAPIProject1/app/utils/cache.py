@@ -15,9 +15,11 @@ logger = logging.getLogger(__name__)
 query_cache: Dict[str, Dict[str, Any]] = {}
 
 
-def generate_query_id(prompt: str, filters: Dict[str, Any]) -> str:
-    """Generate a unique query ID based on prompt and filters"""
-    cache_key = f"{prompt}_{json.dumps(filters, sort_keys=True)}"
+def generate_query_id(prompt: str, filters: Dict[str, Any], user_id: str = None) -> str:
+    """Generate a unique query ID based on prompt, filters, and user_id"""
+    # Include user_id to ensure cache isolation between users
+    user_part = f"user_{user_id}_" if user_id else "global_"
+    cache_key = f"{user_part}{prompt}_{json.dumps(filters, sort_keys=True)}"
     return hashlib.md5(cache_key.encode()).hexdigest()
 
 
@@ -43,14 +45,14 @@ def get_cached_query(query_id: str) -> Optional[Dict[str, Any]]:
     if query_id in query_cache:
         cache_data = query_cache[query_id]
         if datetime.now() - cache_data["timestamp"] <= timedelta(minutes=settings.CACHE_TTL_MINUTES):
-            logger.info(f"Cache HIT for query_id: {query_id}")
+            logger.info(f"✅ Cache HIT for query_id: {query_id} - {len(cache_data.get('filtered_docs', []))} docs cached")
             return cache_data
         else:
             # Expired, remove it
             del query_cache[query_id]
-            logger.info(f"Cache EXPIRED for query_id: {query_id}")
+            logger.info(f"⏰ Cache EXPIRED for query_id: {query_id}")
 
-    logger.info(f"Cache MISS for query_id: {query_id}")
+    logger.info(f"❌ Cache MISS for query_id: {query_id}")
     return None
 
 
@@ -68,4 +70,5 @@ def cache_query_results(query_id: str, answer: str, mode: str,
         "statistics": statistics,
         "timestamp": datetime.now()
     }
-    logger.info(f"Cached query results for query_id: {query_id} ({len(filtered_docs)} transactions)")
+    logger.info(f"💾 CACHED query results for query_id: {query_id} (mode={mode}, {len(filtered_docs)} transactions, answer_len={len(answer)})")
+    logger.info(f"💾 Total cache entries: {len(query_cache)}")

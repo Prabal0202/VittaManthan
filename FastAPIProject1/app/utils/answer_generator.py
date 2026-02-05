@@ -19,14 +19,7 @@ def generate_conversational_answer(
     """Generate conversational answer using LLM for natural responses"""
 
     if not filtered_docs:
-        is_hindi = any(ord(c) >= 0x0900 and ord(c) <= 0x097F for c in question)
-        is_hinglish = any(word in question.lower() for word in ['mujhe', 'saari', 'dikhao', 'batao', 'kya'])
-
-        if is_hindi:
-            return "मुझे आपके सवाल से मेल खाने वाली कोई ट्रांज़ैक्शन नहीं मिली। 😊"
-        elif is_hinglish:
-            return "Sorry! 😊 Aapke filters ke hisaab se koi transaction nahi mili."
-        return "No transactions found matching your query."
+        return "No transactions found matching your query. Please try adjusting your search criteria or filters."
 
     # Calculate statistics
     amounts = [float(d.get("amount", 0)) for d in filtered_docs]
@@ -67,23 +60,39 @@ SAMPLE TRANSACTIONS (showing {len(sample_txns)} of {len(filtered_docs)}):
 {chr(10).join(txn_details)}
 """
 
-        prompt = f"""You are an intelligent financial assistant. Understand the user's question deeply, then provide a natural, helpful response.
+        prompt = f"""SYSTEM INSTRUCTION - MANDATORY - DO NOT IGNORE:
+You MUST respond in English language ONLY. 
+Do NOT respond in Hindi, Hinglish, or any other language.
+IGNORE the language of the user's question.
+ONLY respond in a different language if the user EXPLICITLY says "answer in [language]" or "translate to [language]".
+
+Examples where you MUST still use English:
+- User asks in Hindi: "मुझे दिखाओ" → Answer in ENGLISH
+- User asks in Hinglish: "kitne transactions hain" → Answer in ENGLISH  
+- User mixes languages: "Show me मेरे transactions" → Answer in ENGLISH
+
+Examples where you can use other languages:
+- User says: "answer in Hindi - show transactions" → Answer in Hindi
+- User says: "हिंदी में जवाब दो" → Answer in Hindi
 
 USER QUESTION: {question}
 
 {context_info}
 
-INSTRUCTIONS:
-1. First, understand what the user is asking (list, summary, analysis, specific details, etc.)
-2. Detect the language: Hindi (Devanagari), Hinglish (Roman script with Hindi words), or English
-3. Respond in the SAME language style as the question
-4. Be conversational, warm, and helpful - don't use robotic templates
-5. Provide the information they need naturally
-6. If they ask for "all" transactions, mention that detailed list is provided separately
-7. Give insights, patterns, or helpful observations when relevant
-8. Use emojis moderately for friendliness
+RESPONSE FORMAT:
+1. Use tables (with | symbols) for data presentation
+2. Use bullet points for statistics
+3. Be detailed and professional
+4. Structure: Summary → Tables → Insights
 
-YOUR NATURAL RESPONSE:"""
+Example table:
+| Date       | Description | Amount   | Mode |
+|------------|-------------|----------|------|
+| 2024-01-15 | Grocery     | ₹500.00  | UPI  |
+
+REMEMBER: Respond in ENGLISH ONLY unless explicitly asked for translation.
+
+YOUR DETAILED ENGLISH RESPONSE:"""
 
         try:
             response = llm_instance.invoke(prompt)
@@ -171,7 +180,7 @@ USER QUESTION: {question}
 {context_info}
 
 INSTRUCTIONS:
-1. First, understand what the user is asking (list, summary, analysis, specific details, etc.)
+1. First, understand what the user is asking (list, summary, analysis, specific details, etc.) by default answer in English language untill user explicitly ask in other language
 2. Detect the language: Hindi (Devanagari), Hinglish (Roman script with Hindi words), or English
 3. Respond in the SAME language style as the question
 4. Be conversational, warm, and helpful - don't use robotic templates
