@@ -3,7 +3,7 @@ Health check and status endpoints
 """
 
 from fastapi import APIRouter
-from app.utils.data_store import get_ingested_data
+from app.utils.data_store import get_ingested_data, get_user_stats, has_ingested_data
 
 router = APIRouter()
 
@@ -32,7 +32,7 @@ async def root():
 
 @router.get("/status")
 async def get_ingestion_status():
-    """Check the status of ingested context data"""
+    """Check the status of ingested context data (global/legacy)"""
     ingested_data = get_ingested_data()
 
     return {
@@ -40,6 +40,19 @@ async def get_ingestion_status():
         "transactions_count": len(ingested_data["transactions"]),
         "last_updated": ingested_data["last_updated"],
         "vectorstore_ready": ingested_data["vectorstore"] is not None
+    }
+
+
+@router.get("/status/users")
+async def get_all_users_status():
+    """Check the status of all users' ingested data"""
+    user_stats = get_user_stats()
+    global_has_data = has_ingested_data(user_id=None)
+
+    return {
+        "multi_user_stats": user_stats,
+        "global_data_exists": global_has_data,
+        "message": "Use user_id in /ingest and /prompt endpoints for multi-user isolation"
     }
 
 

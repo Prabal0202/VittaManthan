@@ -34,6 +34,7 @@ class RAGRequest(BaseModel):
 class IngestRequest(BaseModel):
     """Request model for ingesting context data"""
     context_data: List[Dict[str, Any]] = Field(..., description="List of transaction records to ingest")
+    user_id: Optional[str] = Field(None, description="User ID for data isolation (optional)")
 
 
 class IngestResponse(BaseModel):
@@ -42,6 +43,7 @@ class IngestResponse(BaseModel):
     message: str
     transactions_ingested: int
     timestamp: str
+    user_id: Optional[str] = None
 
 
 class PromptRequest(BaseModel):
@@ -52,6 +54,7 @@ class PromptRequest(BaseModel):
     show_all: bool = Field(True, description="Show all matching transactions")
     use_full_data: Optional[bool] = Field(None, description="Force full scan mode")
     query_id: Optional[str] = Field(None, description="Query ID for pagination caching (auto-generated if not provided)")
+    user_id: Optional[str] = Field(None, description="User ID for data isolation (optional)")
 
 
 class TransactionInfo(BaseModel):

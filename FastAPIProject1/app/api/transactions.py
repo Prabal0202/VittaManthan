@@ -172,31 +172,38 @@ async def query_transactions(request: RAGRequest):
 @router.post("/query/stream")
 async def query_transactions_stream(request: PromptRequest):
     """
-    Streaming endpoint: Accept only prompt and return LLM response as a stream using pre-ingested data
+    Streaming endpoint: Accept only prompt and return LLM response as a stream using pre-ingested data (with multi-user support)
 
     This endpoint:
-    1. Receives user question (prompt) only
-    2. Uses previously ingested context data and vectorstore
+    1. Receives user question (prompt) and optional user_id
+    2. Uses previously ingested context data and vectorstore for that user
     3. Applies filters based on the question
     4. Uses LLM to generate natural language response in streaming mode
     5. Returns Server-Sent Events (SSE) stream with chunks of the answer
+
+    Multi-user support:
+    - If user_id is provided: Streams only that user's data
+    - If user_id is None: Streams global data (backward compatible)
     """
     if not embeddings_model or not llm_streaming:
         raise HTTPException(status_code=503, detail="Models not initialized")
 
-    # Check if data has been ingested
-    if not has_ingested_data():
+    user_id = request.user_id
+    user_info = f" for user_id={user_id}" if user_id else " (global)"
+
+    # Check if data has been ingested for this user
+    if not has_ingested_data(user_id=user_id):
         raise HTTPException(
             status_code=400,
-            detail="No context data ingested. Please call /ingest endpoint first."
+            detail=f"No context data ingested{user_info}. Please call /ingest endpoint first."
         )
 
     async def generate_stream():
         try:
-            logger.info(f"Processing streaming query: {request.prompt}")
+            logger.info(f"Processing streaming query{user_info}: {request.prompt}")
 
-            # Get ingested data
-            ingested_data = get_ingested_data()
+            # Get ingested data for this specific user
+            ingested_data = get_ingested_data(user_id=user_id)
             documents = ingested_data["transactions"]
             vectorstore = ingested_data["vectorstore"]
 
@@ -350,19 +357,31 @@ async def query_transactions_stream(request: PromptRequest):
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest_context_data(request: IngestRequest):
     """
-    Ingest endpoint: Accept and store context data for later querying
+    Ingest endpoint: Accept and store context data for later querying (with multi-user support)
 
     This endpoint:
-    1. Receives transaction data (context_data)
+    1. Receives transaction data (context_data) and optional user_id
     2. Creates vector embeddings from the transaction data
-    3. Stores the vectorstore and documents in memory for later use
+    3. Stores the vectorstore and documents in memory for later use (isolated by user_id if provided)
     4. Returns confirmation with timestamp
+
+    Multi-user support:
+    - If user_id is provided: Data is stored separately for that user
+    - If user_id is None: Data is stored globally (backward compatible)
     """
     if not embeddings_model or not llm:
         raise HTTPException(status_code=503, detail="Models not initialized")
 
     try:
-        logger.info(f"Ingesting context data: {len(request.context_data)} transactions")
+        user_id = request.user_id
+        user_info = f" for user_id={user_id}" if user_id else " (global)"
+
+        if user_id:
+            logger.info(f"🔵 MULTI-USER MODE: Ingesting {len(request.context_data)} transactions for user_id='{user_id}'")
+        else:
+            logger.info(f"🔴 LEGACY MODE: Ingesting {len(request.context_data)} transactions in global store")
+
+        logger.info(f"Ingesting context data: {len(request.context_data)} transactions{user_info}")
 
         # Initialize RAG service
         rag_service = RAGService(embeddings_model, llm)
@@ -370,16 +389,17 @@ async def ingest_context_data(request: IngestRequest):
         # Create vector store
         vectorstore, langchain_docs = rag_service.create_vector_store(request.context_data)
 
-        # Store in global state
-        set_ingested_data(request.context_data, vectorstore, langchain_docs)
+        # Store in user-specific or global state
+        set_ingested_data(request.context_data, vectorstore, langchain_docs, user_id=user_id)
 
-        ingested_data = get_ingested_data()
+        ingested_data = get_ingested_data(user_id=user_id)
 
         return IngestResponse(
             status="success",
-            message="Context data ingested successfully",
+            message=f"Context data ingested successfully{user_info}",
             transactions_ingested=len(request.context_data),
-            timestamp=ingested_data["last_updated"]
+            timestamp=ingested_data["last_updated"],
+            user_id=user_id
         )
 
     except Exception as e:
@@ -390,15 +410,19 @@ async def ingest_context_data(request: IngestRequest):
 @router.post("/prompt", response_model=RAGResponse)
 async def query_with_prompt(request: PromptRequest):
     """
-    Prompt endpoint: Accept only prompt and query against pre-ingested data
+    Prompt endpoint: Accept only prompt and query against pre-ingested data (with multi-user support)
 
     This endpoint:
-    1. Receives user question (prompt) only
-    2. Uses previously ingested context data and vectorstore
+    1. Receives user question (prompt) and optional user_id
+    2. Uses previously ingested context data and vectorstore for that user
     3. Applies filters based on the question
     4. Uses LLM to generate natural language response (ONLY ONCE per query)
     5. Caches results for pagination
     6. Returns paginated results with statistics
+
+    Multi-user support:
+    - If user_id is provided: Queries only that user's data
+    - If user_id is None: Queries global data (backward compatible)
 
     For pagination:
     - First request (page=1): Generates answer with LLM and caches results
@@ -407,22 +431,25 @@ async def query_with_prompt(request: PromptRequest):
     if not embeddings_model or not llm:
         raise HTTPException(status_code=503, detail="Models not initialized")
 
-    # Check if data has been ingested
-    if not has_ingested_data():
+    user_id = request.user_id
+    user_info = f" for user_id={user_id}" if user_id else " (global)"
+
+    # Check if data has been ingested for this user
+    if not has_ingested_data(user_id=user_id):
         raise HTTPException(
             status_code=400,
-            detail="No context data ingested. Please call /ingest endpoint first."
+            detail=f"No context data ingested{user_info}. Please call /ingest endpoint first."
         )
 
     try:
-        logger.info(f"Processing prompt query: {request.prompt}, page: {request.page}")
+        logger.info(f"Processing prompt query{user_info}: {request.prompt}, page: {request.page}")
 
-        # Get ingested data
-        ingested_data = get_ingested_data()
+        # Get ingested data for this specific user
+        ingested_data = get_ingested_data(user_id=user_id)
         documents = ingested_data["transactions"]
         vectorstore = ingested_data["vectorstore"]
 
-        logger.info(f"Using ingested data: {len(documents)} transactions")
+        logger.info(f"Using ingested data{user_info}: {len(documents)} transactions")
 
         # Extract filters to generate/validate query_id
         filters = extract_filters_from_query(request.prompt)
@@ -585,6 +612,7 @@ async def query_with_prompt(request: PromptRequest):
                 result = rag_service.process_vector_search_query(vectorstore, request.prompt, k_value)
                 response_data["answer"] = result
                 response_data["matching_transactions_count"] = k_value
+
 
         return RAGResponse(**response_data)
 

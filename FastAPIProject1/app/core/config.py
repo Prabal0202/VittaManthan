@@ -37,10 +37,12 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = "https://openrouter.ai/api/v1"
 
-    # Free LLM models to try
+    # LLM Model Configuration (can be set via environment variable)
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "arcee-ai/trinity-large-preview:free")
+
+    # Free LLM models to try (reference list)
     FREE_MODELS: list = [
         "arcee-ai/trinity-large-preview:free",
-        "nvidia/nemotron-3-nano-30b-a3b:free",
         "nvidia/nemotron-3-nano-30b-a3b:free",
         "openai/gpt-oss-120b:free",
         "meta-llama/llama-3.2-3b-instruct:free",
