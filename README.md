@@ -310,8 +310,6 @@ VittaManthan follows a **microservices architecture** with clear separation of c
 
 ---
 
----
-
 ## 🧩 Technology Stack
 
 | Layer | Technology | Purpose |
@@ -898,39 +896,39 @@ docker-compose up -d
 # Frontend:      http://localhost:5173
 ```
 
-### Manual Setup
+### 🛠 Manual Setup
 
-**1. Start Config Server**
+**1. Start Config Server** ⚙️
 ```bash
 cd configserver
 ./mvnw spring-boot:run
 ```
 
-**2. Start Auth Service**
+**2. Start Auth Service** 🔐
 ```bash
 cd authservices
 ./mvnw spring-boot:run
 ```
 
-**3. Start Account Service**
+**3. Start Account Service** 🏦
 ```bash
 cd accountservice
 ./mvnw spring-boot:run
 ```
 
-**4. Start Transaction Service**
+**4. Start Transaction Service** 💳
 ```bash
 cd transactionservice
 ./mvnw spring-boot:run
 ```
 
-**5. Start Gateway Server**
+**5. Start Gateway Server** 🌐
 ```bash
 cd gatewayserver
 ./mvnw spring-boot:run
 ```
 
-**6. Start RAG Service**
+**6. Start RAG Service** 🧠
 ```bash
 cd FastAPIProject1
 pip install -r requirements_api.txt
@@ -938,11 +936,18 @@ python run.py
 # Or: uvicorn app.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
-**7. Start Frontend** *(on `frontend` branch)*
+**7. Start Frontend** 🎨 *(on `feature/frontend` branch)*
 ```bash
+git checkout feature/frontend
+cd frontend
 npm install
 npm run dev
 ```
+
+**8. Access the Application** 🚀
+- **Frontend**: http://localhost:5173
+- **API Gateway**: http://localhost:8072
+- **RAG Service API Docs**: http://localhost:9000/docs
 
 ---
 
